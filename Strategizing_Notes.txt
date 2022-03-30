@@ -11,3 +11,4 @@ Strategy
 - alpha beta pruning -> in a certain state, if a certain player can win with a move, there is no need to consider other moves
 - herusitic: minimum number of walls to enclose the player
 - determine conditions for switching from simple heuristic to alpha-beta search
+TEST
