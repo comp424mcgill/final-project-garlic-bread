@@ -54,6 +54,12 @@ class TestAgent(Agent):
 
     def get_valid_moves(self, chess_board, my_pos, max_step):
         print(my_pos)
+        board_size = chess_board.shape[0]
+        num_steps = max_step
+        while (num_steps > 0)
+            
+
+
         print(chess_board.shape)
         
 
