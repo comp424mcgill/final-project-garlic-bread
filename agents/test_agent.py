@@ -1,8 +1,8 @@
+
 # Student agent: Add your own agent here
 from agents.agent import Agent
 from store import register_agent
 import sys
-
 
 @register_agent("test_agent")
 class TestAgent(Agent):
@@ -61,7 +61,9 @@ class TestAgent(Agent):
 
 
         print(chess_board.shape)
-        
+    
+
+
 
     
 
