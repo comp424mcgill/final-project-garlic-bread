@@ -52,7 +52,7 @@ class TestAgent(Agent):
     def check_valid_input(self, x, y, dir, x_max, y_max):
         return 0 <= x < x_max and 0 <= y < y_max and dir in self.dir_map
 
-    def get_valid_moves(self, chess_board, my_pos, max_step):
+    '''def get_valid_moves(self, chess_board, my_pos, max_step):
         print(my_pos)
         board_size = chess_board.shape[0]
         num_steps = max_step
@@ -61,7 +61,7 @@ class TestAgent(Agent):
 
 
         print(chess_board.shape)
-    
+    '''
 
 
 
