@@ -94,6 +94,7 @@ class Simulator:
         """
         Run multiple simulations of the gameplay and aggregate win %
         """
+        args = get_args()
         p1_win_count = 0
         p2_win_count = 0
         p1_times = []

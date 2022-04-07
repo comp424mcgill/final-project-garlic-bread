@@ -39,7 +39,7 @@ class TestAgent(Agent):
         print(terminal_steps)
         print("Stupid Steps:")
         print(stupid_steps)
-        not_stupid_steps = self.filter_stupid_steps(chess_board,valid_steps,adv_pos,max_step)
+        not_stupid_steps = self.get_stupid_steps(chess_board,valid_steps,adv_pos,max_step)
         print(not_stupid_steps)
 
         text = input("Your move (x,y,dir) or input q to quit: ")

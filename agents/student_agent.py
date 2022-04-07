@@ -24,30 +24,25 @@ class StudentAgent(Agent):
             "d": 2,
             "l": 3,
         }
+        self.moves = ((-1, 0), (0, 1), (1, 0), (0, -1)) # moves as defined in world.py (useful for reusing world.py code)
+        self.opposites = {0: 2, 1: 3, 2: 0, 3: 1} # opposite directions as defined in world.py
         self.autoplay = True
 
     # functions set_barrier(), check_valid_step(), check_endgame() below copied from world.py:
-    def set_barrier(self, chess_board, r, c, dir):
+    def set_barrier(self, chess_board, r, c, dir): # adapted from world.py function of same name
         # Set the barrier to True
         chess_board[r, c, dir] = True
-        
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-        opposites = {0: 2, 1: 3, 2: 0, 3: 1}
-
         # Set the opposite barrier to True
-        move = moves[dir]
-        chess_board[r + move[0], c + move[1], opposites[dir]] = True
+        move = self.moves[dir]
+        chess_board[r + move[0], c + move[1], self.opposites[dir]] = True
 
     def unset_barrier(self, chess_board, r, c, dir):
         # Set the barrier to False
         chess_board[r, c, dir] = False
        
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-        opposites = {0: 2, 1: 3, 2: 0, 3: 1}
-
          # Set the opposite barrier to False
-        move = moves[dir]
-        chess_board[r + move[0], c + move[1], opposites[dir]] = False
+        move = self.moves[dir]
+        chess_board[r + move[0], c + move[1], self.opposites[dir]] = False
 
     def check_valid_step(self, chess_board, my_start_pos, my_end_pos, barrier_dir, adv_pos, max_step):
         """
@@ -62,10 +57,7 @@ class StudentAgent(Agent):
         barrier_dir : int
             The direction of the barrier.
         """
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-
         # Endpoint already has barrier or is boarder
-        print(my_end_pos)
         r, c = my_end_pos
         if chess_board[r, c, barrier_dir]:
             return False
@@ -83,11 +75,11 @@ class StudentAgent(Agent):
             r, c = cur_pos
             if cur_step == max_step: 
                 break
-            for dir, move in enumerate(moves):
+            for dir, move in enumerate(self.moves):
                 if chess_board[r, c, dir]:
                     continue
 
-                next_pos = cur_pos + move
+                next_pos = (cur_pos[0] + move[0],cur_pos[1]+move[1])
                 if np.array_equal(next_pos, adv_pos) or tuple(next_pos) in visited:
                     continue
                 if np.array_equal(next_pos, my_end_pos):
@@ -99,7 +91,7 @@ class StudentAgent(Agent):
 
         return is_reached
 
-    def check_endgame(self, chess_board, my_pos, adv_pos):
+    def check_endgame(self, chess_board, my_pos, adv_pos,board_size):
         """
         Check if the game ends and compute the current score of the agents.
 
@@ -112,9 +104,6 @@ class StudentAgent(Agent):
         player_2_score : int
             The score of player 2.
         """
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
-        board_size = chess_board.shape[1]    # array3d.shape ---> (layer,row,column)
-        
         # Union-Find
         father = dict()
         for r in range(board_size):
@@ -132,7 +121,7 @@ class StudentAgent(Agent):
         for r in range(board_size):
             for c in range(board_size):
                 for dir, move in enumerate(
-                    moves[1:3]
+                    self.moves[1:3]
                 ):  # Only check down and right
                     if chess_board[r, c, dir + 1]:
                         continue
@@ -187,210 +176,112 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        board_size = chess_board.shape[1]
 
-        best_score = 0
-        best_move = (-1,-1)
-        
-        my_new_pos = (-1,-1)
-        dir_wall = -1
+        best_score = -1
 
-        # Stores all previous moves that we have searched
-        previous_moves = [((-1,-1), -1)]
+        candidate_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step,board_size)
+            
+        for step in candidate_steps:
+            # a new move of step-size steps has been generated here---
+            r,c,dir = (step[0],step[1],step[2])
 
-        for step_size in range(1, max_step+1): # eg. when moving 4 steps
-            for _ in range (0, 3):   # we make this number of different moves for our agent in this step_size
-                                    # eg. we take 2 different 4-step moves of the agent as a possibility to search
-                for each_step in range (1, step_size+1): # move to each square...
-
-                    # decide a direction to move in
-                    dir_move = np.random.randint(0, 4)
-                    
-                    # we place a wall only on the last step:
-                    if each_step == step_size:
-                        dir_wall = np.random.randint(0,4)
-
-                    # Go to a new position
-                    r,c = my_pos
-                    rd,cd = moves[dir_move]
-                    my_new_pos = (r+rd, c+cd)
-                    
-                    while not self.check_valid_step(chess_board, my_pos, my_new_pos, dir_wall, adv_pos, max_step):
-
-                        # generate a valid next step:
-                        dir_move = np.random.randint(0,4)
-                        
-                        # we place a wall only on the last step:
-                        if each_step == step_size:
-                            dir_wall = np.random.randint(0,4)
-
-                            # If we have already checked this move, do new move... (back to while)
-                            if (dir_move, dir_wall) in previous_moves:
-                                dir_move = (-1,-1)
-                                dir_wall = -1
-                        r,c = my_pos
-                        rd,cd = moves[dir_move]
-                        my_new_pos = (r+rd, c+cd)
-                    
-                    # If we are at the last step
-                    if each_step == step_size:
-                        r, c = my_new_pos
-                        self.set_barrier(chess_board, r, c, dir_wall) # and unset_barrier at the same position later
-                        # Add this move to the move history
-                        previous_moves = previous_moves + [(my_new_pos, dir_wall)]
-               
-                # a new move of step-size steps has been generated here---
-
-                # Run the minimax algo to check where to place our agent is the best
-                # this is the minimizing node
-                score = self.minimax(chess_board, my_new_pos, adv_pos, max_step, False, 10)
+            self.set_barrier(chess_board,r,c,dir)
+            # Run the minimax algo to check where to place our agent is the best
+            # this is the minimizing node
+            score = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, 3)
+            
+            self.unset_barrier(chess_board, r, c, dir)
                 
-                # Get the optimal ? position and wall direction
-                r, c = my_new_pos
-                self.unset_barrier(chess_board, r, c, dir_wall) # ??? this is not right
-                if score > best_score:
-                    best_score = score
-                    best_move = my_new_pos
-                    best_dir_wall = dir_wall
+            if score == 1:
+                best_move = ((r,c),dir)
+                break
+            elif score > best_score:
+                best_move = ((r,c),dir)
                 
-        return best_move, best_dir_wall
+        return best_move
 
-    def minimax(self, chess_board, my_pos, adv_pos, max_step, is_maximizing, depth):
+    def minimax(self, chess_board, my_pos, adv_pos, max_step, board_size, is_maximizing, depth):
         """
         is_maximizing is a bool indicating whether we are at maximizing or minimizing step
         depth is the depth of search
+
+        Returns
+        score: int
+            1 -> max player wins
+            0.75 -> depth limit reached
+            0.5 -> draw
+            0 -> min player wins
+
         """
         # Check base cases:
-        is_end, s1, s2 = self.check_endgame(chess_board, my_pos, adv_pos)
+        is_end, s1, s2 = self.check_endgame(chess_board, my_pos, adv_pos,board_size)
         
-        # if a draw:
-        if is_end & s1==s2:
-            return 0.5
+        # if a draw or depth limit reached:
         
-        # if not draw:
-        # if the max player wins 
-        if is_end & (not is_maximizing): return 1
-        # if the min player wins
-        elif is_end & is_maximizing: return 0
+        if is_end:
+            if s1 > s2: return 1
+            elif s1 < s2: return 0
+            else: return 0.5
 
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        if depth == 0: # if depth limit reached
+            return 0.75
+
         best_score = 0
 
-        my_new_pos = (-1,-1)
-        dir_wall = -1
+
 
         # Stores all previous moves that we searched in each for loop
-        previous_moves = [((-1,-1), -1)]
+        previous_moves = [(-1,-1,-1)]
 
         if is_maximizing:
 
-            for step_size in range(1, max_step+1): # eg. when moving 4 steps
-                for _ in range (0, 3):   # we make this number of different moves for our agent in this step_size
-                                        # eg. we take 2 different 4-step moves of the agent as a possibility to search
-                    for each_step in range (1, step_size+1): # move to each square...
+            candidate_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step,board_size)
 
-                        # decide a direction to move in
-                        dir_move = np.random.randint(0, 4)
-                        
-                        # we place a wall only on the last step:
-                        if each_step == step_size:
-                            dir_wall = np.random.randint(0,4)
+            for step in candidate_steps: # move to each square...
+                r,c,dir = (step[0],step[1],step[2])
+                self.set_barrier(chess_board, r, c, dir)  # and unset_barrier at the same position later
+                # Add this move to the move history
+                previous_moves.append(step)
+            
 
-                        # Go to a new position
-                        r,c = my_pos
-                        rd,cd = moves[dir_move]
-                        my_new_pos = (r+rd, c+cd)
-                        while not self.check_valid_step(chess_board, my_pos, my_new_pos, dir_wall, adv_pos, max_step):
-                            
-                            # generate a valid next step:
-                            dir_move = np.random.randint(0,4)
-                            
-                            # we place a wall only on the last step:
-                            if each_step == step_size:
-                                dir_wall = np.random.randint(0,4)
+                # Run the minimax algo to check where to place our agent is the best
+                score = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth-1)
+                # end_found, result, = self.minimax(...)
+                
+                self.unset_barrier(chess_board, r, c, dir)
+                
+                if score == 1:
+                    best_score = 1
+                    break
+                elif score > best_score:
+                    best_score = score
 
-                                # If we have already checked this move, do new move... (back to while)
-                                if (dir_move, dir_wall) in previous_moves:
-                                    dir_move = (-1,-1)
-                                    dir_wall = -1
-                            r,c = my_pos
-                            rd,cd = moves[dir_move]
-                            my_new_pos = (r+rd, c+cd)
-
-                        # If we are at the last step
-                        if each_step == step_size:
-                            r, c = my_new_pos
-                            self.set_barrier(chess_board, r, c, dir_wall)  # and unset_barrier at the same position later
-                            # Add this move to the move history
-                            previous_moves = previous_moves + [(my_new_pos, dir_wall)]
-                        
-                    # a new move of step-size steps has been generated here---
-
-                    # Run the minimax algo to check where to place our agent is the best
-                    score = self.minimax(chess_board, my_new_pos, adv_pos, max_step, False, depth+1)
-                    
-                    # Get the optimal ? position and wall direction
-                    r, c = my_new_pos
-                    self.unset_barrier(chess_board, r, c, dir_wall)
-                    if score > best_score:
-                        best_score = score
-            return best_score
+                
+            return score
         
-        else:  # if not is_maximizing: 
+        else:  # if not is_maximizing: (it is the adversary's turn)
 
-            for step_size in range(1, max_step+1): # eg. when moving 4 steps
-                for _ in range (0, 3):   # we make this number of different moves for our agent in this step_size
-                                        # eg. we take 2 different 4-step moves of the agent as a possibility to search
-                    for each_step in range (1, step_size+1): # move to each square...
+            candidate_steps = self.get_valid_steps(chess_board,adv_pos,my_pos,max_step,board_size)
 
-                        # decide a direction to move in
-                        dir_move = np.random.randint(0, 4)
-                        
-                        # we place a wall only on the last step:
-                        if each_step == step_size:
-                            dir_wall = np.random.randint(0,4)
-                        
-                        # Go to a new position
-                        r,c = adv_pos
-                        rd,cd = moves[dir_move]
-                        adv_new_pos = (r+rd, c+cd)
-                        # Now we are taking a step for the adversary...
-                                                 # The arguments are  pos,    new_pos,                ...,        adv_pos,
-                        while not self.check_valid_step(chess_board, adv_pos, adv_new_pos, dir_wall, my_pos, max_step):
-                            
-                            # generate a valid next step:
-                            dir_move = np.random.randint(0,4)
-                            
-                            # we place a wall only on the last step:
-                            if each_step == step_size:
-                                dir_wall = np.random.randint(0,4)
+            for step in candidate_steps: # move to each square...
+                r,c,dir = (step[0],step[1],step[2])
+                self.set_barrier(chess_board, r, c, dir)  # and unset_barrier at the same position later
+                # Add this move to the move history
+                previous_moves.append(step)
+            
 
-                                # If we have already checked this move, do new move... (back to while)
-                                if (dir_move, dir_wall) in previous_moves:
-                                    dir_move = (-1,-1)
-                                    dir_wall = -1
-                            r,c = adv_pos
-                            rd,cd = moves[dir_move]
-                            adv_new_pos = (r+rd, c+cd)
-
-                        # If we are at the last step
-                        if each_step == step_size:
-                            r, c = adv_new_pos
-                            self.set_barrier(chess_board, r, c, dir_wall)  # and unset_barrier at the same position later
-                            # Add this move to the move history
-                            previous_moves = previous_moves + [(adv_new_pos, dir_wall)]
-                        
-                    # a new move of step-size steps has been generated here---
-
-                    # Run the minimax algo to check where to place our agent is the best
-                    score = self.minimax(chess_board, my_pos, adv_new_pos, max_step, True, depth+1) # the TRUE here
-                    
-                    # Get the optimal ? position and wall direction
-                    r, c = adv_new_pos
-                    self.unset_barrier(chess_board, r, c, dir_wall)
-
-                    if score < best_score:  # the LESS THAN here
-                        best_score = score
+                # Run the minimax algo to check where to place our agent is the best
+                score = self.minimax(chess_board, my_pos, (r,c), max_step, board_size, True, depth-1)
+                # end_found, result, = self.minimax(...)
+                
+                self.unset_barrier(chess_board, r, c, dir)
+                
+                if score == 0:
+                    best_score = 0
+                    break
+                elif score < best_score:
+                    best_score = score
             return best_score
 
     # M x M board. max_step = floor((M+1)/2)
@@ -399,5 +290,29 @@ class StudentAgent(Agent):
     # to reduce the branching factor of the search tree but still cover each possible distance, 
     # we can calculate only 2 positions for each number <= max_step, and 4 positions for the wall.
 
-    
+    def get_valid_steps(self, chess_board, my_pos, adv_pos, max_step, board_size): # returns set (can change to list if necessary) of valid steps from current position
+        end_posits = [my_pos]
+        valid_steps = []
+        for n in range(1,max_step+1):
+            for r_dist in range(0,n+1):
+                c_dist = n - r_dist
+                if r_dist == 0:
+                    cur_steps = [(my_pos[0],my_pos[1] + c_dist),(my_pos[0],my_pos[1] - c_dist)]
+                elif c_dist == 0:
+                    cur_steps = [(my_pos[0] + r_dist,my_pos[1]),(my_pos[0] - r_dist,my_pos[1])]
+                else:
+                    cur_steps = [(my_pos[0] + r_dist,my_pos[1] + c_dist),(
+                            my_pos[0] + r_dist,my_pos[1] - c_dist),(
+                            my_pos[0] - r_dist,my_pos[1] + c_dist),(
+                            my_pos[0] - r_dist,my_pos[1] - c_dist)]
+                end_posits.extend(cur_steps)
+        # filter steps which leave boundary or end in adversary's location
+        end_posits = set(filter(lambda end_pos: end_pos[0] < board_size and end_pos[1] < board_size and end_pos[0] >= 0 and end_pos[1] >= 0 and end_pos != adv_pos, end_posits)) 
+        for end_pos in end_posits:
+            for dir in range(0,4):
+                if chess_board[end_pos[0],end_pos[1],dir]:
+                    continue
+                valid_steps.append(tuple((end_pos[0],end_pos[1],dir)))
+        valid_steps = set(filter(lambda step: self.check_valid_step(chess_board, my_pos,[step[0],step[1]],step[2], adv_pos, max_step),valid_steps))
+        return valid_steps
         
