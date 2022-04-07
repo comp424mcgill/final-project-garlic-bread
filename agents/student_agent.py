@@ -204,20 +204,27 @@ class StudentAgent(Agent):
             self.set_barrier(chess_board,r,c,dir)
             # Run the minimax algo to check where to place our agent is the best
             # this is the minimizing node
-            score, ret_depth = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth_limit)
+            score, ret_depth,results = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth_limit)
             
             self.unset_barrier(chess_board, r, c, dir)
-                
+
+            weighted_score = (results[0]-results[1])/(results[2])
+
             if score == 1:
                 best_move = ((r,c),dir)
                 break
             elif score > best_score:
                 best_move = ((r,c),dir)
                 best_depth = ret_depth
+                best_weighted_score = weighted_score
             elif score == best_score and ret_depth < best_depth: # losing or drawing closer to 0 depth (bottom of search tree) is preferred
                 best_move = ((r,c),dir)
                 best_depth = ret_depth
-                
+                best_weighted_score
+            elif score ==  best_score and ret_depth == best_depth and weighted_score > best_weighted_score: # a move which has a higher weighted score is better, all other things equal
+                best_move = ((r,c),dir)
+                best_depth = ret_depth
+                best_weighted_score
         return best_move
 
     def minimax(self, chess_board, my_pos, adv_pos, max_step, board_size, is_maximizing, depth):
@@ -232,20 +239,26 @@ class StudentAgent(Agent):
             0.5 -> draw
             0 -> min player wins
         depth: depth reached for result (if we detect)
-
+        results: [int,int,int]
+            array of results discovered (wins-draws-losses)
         """
         # Check base cases:
         is_end, s1, s2 = self.check_endgame(chess_board, my_pos, adv_pos,board_size)
         
         # if a draw or depth limit reached:
-        
+        results = np.array([0,0,1]) # wins, losses, moves (don't care about draws for this)
+
         if is_end:
-            if s1 > s2: return 1,depth
-            elif s1 < s2: return 0,depth
-            else: return 0.5,depth
+            if s1 > s2: 
+                results[0]=1
+                return 1,depth,results
+            elif s1 < s2:
+                results[1]=1
+                return 0,depth,results
+            else: return 0.5,depth,results
 
         if depth == 0: # if depth limit reached
-            return 0.75,depth
+            return 0.75,depth,results
 
         best_score = 0
         best_depth = depth
@@ -270,11 +283,11 @@ class StudentAgent(Agent):
             
 
                 # Run the minimax algo to check where to place our agent is the best
-                score,ret_depth = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth-1)
+                score,ret_depth,ret_results = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth-1)
                 # end_found, result, = self.minimax(...)
-                
+                results = np.add(results,ret_results) # add results which were found
                 self.unset_barrier(chess_board, r, c, dir)
-                
+
                 if score == 1:
                     best_score = 1
                     best_depth = ret_depth
@@ -284,7 +297,8 @@ class StudentAgent(Agent):
                     best_depth = ret_depth
                 elif score == best_score and ret_depth < best_depth:
                     best_depth = ret_depth
-            return best_score,best_depth
+                
+            return best_score,best_depth,results
         
         else:  # if not is_maximizing: (it is the adversary's turn)
 
@@ -301,9 +315,9 @@ class StudentAgent(Agent):
             
 
                 # Run the minimax algo to check where to place our agent is the best
-                score,ret_depth = self.minimax(chess_board, my_pos, (r,c), max_step, board_size, True, depth-1)
+                score,ret_depth,ret_results = self.minimax(chess_board, my_pos, (r,c), max_step, board_size, True, depth-1)
                 # end_found, result, = self.minimax(...)
-                
+                results = np.add(results,ret_results)
                 self.unset_barrier(chess_board, r, c, dir)
                 
                 if score == 0:
@@ -315,7 +329,7 @@ class StudentAgent(Agent):
                     best_depth = ret_depth
                 elif score == best_score and ret_depth < best_depth:
                     best_depth = ret_depth
-            return best_score,depth
+            return best_score,depth,results
 
     # M x M board. max_step = floor((M+1)/2)
     # for each node in the search tree, it has children for every possible step number : 
