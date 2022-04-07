@@ -262,9 +262,11 @@ class StudentAgent(Agent):
         """
         # Check base cases:
         is_end, s1, s2 = self.check_endgame(chess_board, my_pos, adv_pos)
+        
         # if a draw:
         if is_end & s1==s2:
             return 0.5
+        
         # if not draw:
         # if the max player wins 
         if is_end & (not is_maximizing): return 1
