@@ -28,6 +28,7 @@ class World:
         autoplay=False,
     ):
         """
+        Below is the initialization function __init__():
         Initialize the game world
 
         Parameters
@@ -396,7 +397,7 @@ class World:
         # Set the opposite barrier to True
         move = self.moves[dir]
         self.chess_board[r + move[0], c + move[1], self.opposites[dir]] = True
-
+    
     def random_walk(self, my_pos, adv_pos):
         """
         Randomly walk to the next position in the board.

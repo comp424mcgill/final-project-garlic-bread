@@ -17,4 +17,6 @@ UPDATE:
 We want to reduce the branching factor of the search tree but still cover each possible distance. 
 eg. for a max_step equal to 5, we search some move of distance 1, some move of distance 2, some of distance 3, 4, and 5.
 
-To implement the minimax algo...
+Implemented the minimax algo.
+
+How to call the functions like check_valid_step() from world.py in student_agent.py file??
