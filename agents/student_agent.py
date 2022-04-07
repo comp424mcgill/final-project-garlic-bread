@@ -44,7 +44,7 @@ class StudentAgent(Agent):
         move = self.moves[dir]
         chess_board[r + move[0], c + move[1], self.opposites[dir]] = False
 
-    def check_valid_step(self, chess_board, my_start_pos, my_end_pos, barrier_dir, adv_pos, max_step):
+    def check_valid_step(self, chess_board, my_start_pos, my_end_pos, dir, adv_pos, max_step):
         """
         Check if the step the agent takes is valid (reachable and within max steps).
 
@@ -54,12 +54,12 @@ class StudentAgent(Agent):
             The start position of the agent.
         end_pos : np.ndarray
             The end position of the agent.
-        barrier_dir : int
+        dir : int
             The direction of the barrier.
         """
         # Endpoint already has barrier or is boarder
         r, c = my_end_pos
-        if chess_board[r, c, barrier_dir]:
+        if chess_board[r, c, dir]:
             return False
         if np.array_equal(my_start_pos, my_end_pos):
             return True
@@ -176,11 +176,26 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
+        depth_limit = 3 # set the depth limit
+        
         board_size = chess_board.shape[1]
 
         best_score = -1
+        best_depth = depth_limit
 
-        candidate_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step,board_size)
+        valid_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step,board_size)
+        # filter stupid steps
+        stupid_steps_0 = set(filter(lambda step: self.check_stupid_step_0(chess_board,step),valid_steps)) # depth 0 stupid moves
+        stupid_steps_1 = set(filter(lambda step: self.check_stupid_step_1(chess_board,step,adv_pos,max_step),valid_steps)) # depth 1 stupid moves
+        candidate_steps = valid_steps - (stupid_steps_0 | stupid_steps_1)
+
+        if len(candidate_steps) == 0:
+            if(len(stupid_steps_1 > 0)):
+                best_move = stupid_steps_1.pop()
+            else:
+                best_move = stupid_steps_0.pop()
+    
+        
             
         for step in candidate_steps:
             # a new move of step-size steps has been generated here---
@@ -189,7 +204,7 @@ class StudentAgent(Agent):
             self.set_barrier(chess_board,r,c,dir)
             # Run the minimax algo to check where to place our agent is the best
             # this is the minimizing node
-            score = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, 3)
+            score, ret_depth = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth_limit)
             
             self.unset_barrier(chess_board, r, c, dir)
                 
@@ -198,6 +213,10 @@ class StudentAgent(Agent):
                 break
             elif score > best_score:
                 best_move = ((r,c),dir)
+                best_depth = ret_depth
+            elif score == best_score and ret_depth < best_depth: # losing or drawing closer to 0 depth (bottom of search tree) is preferred
+                best_move = ((r,c),dir)
+                best_depth = ret_depth
                 
         return best_move
 
@@ -212,6 +231,7 @@ class StudentAgent(Agent):
             0.75 -> depth limit reached
             0.5 -> draw
             0 -> min player wins
+        depth: depth reached for result (if we detect)
 
         """
         # Check base cases:
@@ -220,69 +240,82 @@ class StudentAgent(Agent):
         # if a draw or depth limit reached:
         
         if is_end:
-            if s1 > s2: return 1
-            elif s1 < s2: return 0
-            else: return 0.5
+            if s1 > s2: return 1,depth
+            elif s1 < s2: return 0,depth
+            else: return 0.5,depth
 
         if depth == 0: # if depth limit reached
-            return 0.75
+            return 0.75,depth
 
         best_score = 0
-
+        best_depth = depth
 
 
         # Stores all previous moves that we searched in each for loop
-        previous_moves = [(-1,-1,-1)]
+        # previous_moves = [(-1,-1,-1)]
 
         if is_maximizing:
 
-            candidate_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step,board_size)
+            valid_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step,board_size)
+            # filter stupid steps
+            stupid_steps_0 = set(filter(lambda step: self.check_stupid_step_0(chess_board,step),valid_steps)) # depth 0 stupid moves
+            stupid_steps_1 = set(filter(lambda step: self.check_stupid_step_1(chess_board,step,adv_pos,max_step),valid_steps)) # depth 1 stupid moves
+            candidate_steps = valid_steps - (stupid_steps_0 | stupid_steps_1)
 
             for step in candidate_steps: # move to each square...
                 r,c,dir = (step[0],step[1],step[2])
                 self.set_barrier(chess_board, r, c, dir)  # and unset_barrier at the same position later
                 # Add this move to the move history
-                previous_moves.append(step)
+                # previous_moves.append(step)
             
 
                 # Run the minimax algo to check where to place our agent is the best
-                score = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth-1)
+                score,ret_depth = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth-1)
                 # end_found, result, = self.minimax(...)
                 
                 self.unset_barrier(chess_board, r, c, dir)
                 
                 if score == 1:
                     best_score = 1
+                    best_depth = ret_depth
                     break
                 elif score > best_score:
                     best_score = score
-
-                
-            return score
+                    best_depth = ret_depth
+                elif score == best_score and ret_depth < best_depth:
+                    best_depth = ret_depth
+            return best_score,best_depth
         
         else:  # if not is_maximizing: (it is the adversary's turn)
 
-            candidate_steps = self.get_valid_steps(chess_board,adv_pos,my_pos,max_step,board_size)
-
+            valid_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step,board_size)
+            # filter stupid steps
+            stupid_steps_0 = set(filter(lambda step: self.check_stupid_step_0(chess_board,step),valid_steps)) # depth 0 stupid moves
+            stupid_steps_1 = set(filter(lambda step: self.check_stupid_step_1(chess_board,step,my_pos,max_step),valid_steps)) # depth 1 stupid moves
+            candidate_steps = valid_steps - (stupid_steps_0 | stupid_steps_1)
             for step in candidate_steps: # move to each square...
                 r,c,dir = (step[0],step[1],step[2])
                 self.set_barrier(chess_board, r, c, dir)  # and unset_barrier at the same position later
                 # Add this move to the move history
-                previous_moves.append(step)
+                # previous_moves.append(step)
             
 
                 # Run the minimax algo to check where to place our agent is the best
-                score = self.minimax(chess_board, my_pos, (r,c), max_step, board_size, True, depth-1)
+                score,ret_depth = self.minimax(chess_board, my_pos, (r,c), max_step, board_size, True, depth-1)
                 # end_found, result, = self.minimax(...)
                 
                 self.unset_barrier(chess_board, r, c, dir)
                 
                 if score == 0:
                     best_score = 0
+                    best_depth = ret_depth
                     break
-                elif score < best_score:
+                elif score > best_score: # technically means the opposing agent prefers a draw even tho we prefer a win
                     best_score = score
-            return best_score
+                    best_depth = ret_depth
+                elif score == best_score and ret_depth < best_depth:
+                    best_depth = ret_depth
+            return best_score,depth
 
     # M x M board. max_step = floor((M+1)/2)
     # for each node in the search tree, it has children for every possible step number : 
@@ -314,5 +347,39 @@ class StudentAgent(Agent):
                     continue
                 valid_steps.append(tuple((end_pos[0],end_pos[1],dir)))
         valid_steps = set(filter(lambda step: self.check_valid_step(chess_board, my_pos,[step[0],step[1]],step[2], adv_pos, max_step),valid_steps))
-        return valid_steps
+        return valid_steps        
+
+    def get_empty_edges(self,chess_board,pos):
+        empty_edges = []
+        for dir in range(0,4):
+            if not (chess_board[pos[0],pos[1],dir]):
+                empty_edges.append(dir)
+        return empty_edges
+
+    def check_stupid_step_0(self,chess_board,step): # A 0-stupid_step makes us lose this turn
+        """
+        This is not exhaustive of moves in which make us lose
+        Checks for if move puts us in a 1x1 box, forcing us to lose
+        """
+        r,c = (step[0],step[1])
+        empty_edges = self.get_empty_edges(chess_board,(r,c))
+        if (len(empty_edges) == 1):
+            return True
+        return False
+
+    def check_stupid_step_1(self, chess_board,step,adv_pos,max_step): # A 1-stupid step allows the opponent to beat us next turn 
+        """
+        This is not exhaustive of moves in which we can lose next turn
+        Checks for if move puts us in a box with 3 edges around it where the opponent can reach the empty edge in their next turn
+        """
+        r,c,dir = step
+        empty_edges = self.get_empty_edges(chess_board,(r,c))
+        if (len(empty_edges) == 2): # might be stupid
+            empty_edges.remove(dir)
+            empty_dir = empty_edges[0]
+            move = self.moves[empty_dir]
+            win_pos = (r+move[0],c+move[1])
+            if self.check_valid_step(chess_board,adv_pos,win_pos,self.opposites[empty_dir],(r,c),max_step):
+                return True
+        return False
         
