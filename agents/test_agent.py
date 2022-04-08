@@ -281,6 +281,32 @@ class TestAgent(Agent):
         return filtered_steps
 
     
+    def check_stupid_step_0(self,chess_board,step): # A 0-stupid_step makes us lose this turn
+        """
+        This is not exhaustive of moves in which make us lose
+        Checks for if move puts us in a 1x1 box, forcing us to lose
+        """
+        r,c = (step[0],step[1])
+        empty_edges = self.get_empty_edges(chess_board,(r,c))
+        if (len(empty_edges) == 1):
+            return True
+        return False
+
+    def check_stupid_step_1(self, chess_board,step,adv_pos,max_step): # A 1-stupid step allows the opponent to beat us next turn 
+        """
+        This is not exhaustive of moves in which we can lose next turn
+        Checks for if move puts us in a box with 3 edges around it where the opponent can reach the empty edge in their next turn
+        """
+        r,c,dir = step
+        empty_edges = self.get_empty_edges(chess_board,(r,c))
+        if (len(empty_edges) == 2): # might be stupid
+            empty_edges.remove(dir)
+            empty_dir = empty_edges[0]
+            move = self.moves[empty_dir]
+            win_pos = (r+move[0],c+move[1])
+            if self.check_valid_step(chess_board,adv_pos,win_pos,self.opposites[empty_dir],(r,c),max_step):
+                return True
+        return False
 
 
 
