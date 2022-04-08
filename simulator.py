@@ -94,7 +94,7 @@ class Simulator:
         """
         Run multiple simulations of the gameplay and aggregate win %
         """
-        args = get_args()
+        args = self.args
         p1_win_count = 0
         p2_win_count = 0
         p1_times = []
@@ -118,7 +118,9 @@ class Simulator:
                     )
                 if p0_score > p1_score:
                     p1_win_count += 1
+                    print("p1 wins!")
                 elif p0_score < p1_score:
+                    print("p2 wins!")
                     p2_win_count += 1
                 else:  # Tie
                     p1_win_count += 1
