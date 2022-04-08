@@ -118,9 +118,7 @@ class Simulator:
                     )
                 if p0_score > p1_score:
                     p1_win_count += 1
-                    print("p1 wins!")
                 elif p0_score < p1_score:
-                    print("p2 wins!")
                     p2_win_count += 1
                 else:  # Tie
                     p1_win_count += 1
@@ -129,7 +127,7 @@ class Simulator:
                 p2_times.append(p1_time)
 
         logger.info(
-            f"Player {PLAYER_1_NAME} win percentage: {p1_win_count / self.args.autoplay_runs} ({np.round(np.mean(p1_times), 5)} seconds/game)"
+            f"layer {PLAYER_1_NAME} win percentage: {p1_win_count / self.args.autoplay_runs} ({np.round(np.mean(p1_times), 5)} seconds/game)"
         )
         logger.info(
             f"Player {PLAYER_2_NAME} win percentage: {p2_win_count / self.args.autoplay_runs}, ({np.round(np.mean(p2_times), 5)} seconds/game)"

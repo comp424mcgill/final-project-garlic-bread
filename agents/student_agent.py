@@ -27,9 +27,9 @@ class StudentAgent(Agent):
         self.moves = ((-1, 0), (0, 1), (1, 0), (0, -1)) # moves as defined in world.py (useful for reusing world.py code)
         self.opposites = {0: 2, 1: 3, 2: 0, 3: 1} # opposite directions as defined in world.py
         self.autoplay = True
-        self.check_endgame_timer = 0
-        self.check_step_timer = 0
         self.first_turn = True
+        self.timer = 0
+        self.time_limit = 25
 
     # functions set_barrier(), check_valid_step(), check_endgame() below copied from world.py:
     def set_barrier(self, chess_board, r, c, dir): # adapted from world.py function of same name
@@ -46,53 +46,6 @@ class StudentAgent(Agent):
          # Set the opposite barrier to False
         move = self.moves[dir]
         chess_board[r + move[0], c + move[1], self.opposites[dir]] = False
-
-    def check_valid_step(self, chess_board, my_start_pos, my_end_pos, dir, adv_pos, max_step):
-        """
-        Check if the step the agent takes is valid (reachable and within max steps).
-
-        Parameters
-        ----------
-        start_pos : tuple
-            The start position of the agent.
-        end_pos : np.ndarray
-            The end position of the agent.
-        dir : int
-            The direction of the barrier.
-        """
-
-        # Endpoint already has barrier or is boarder
-        r, c = my_end_pos
-        if chess_board[r, c, dir]:
-            return False
-        if np.array_equal(my_start_pos, my_end_pos):
-            return True
-
-        # Get position of the adversary... deleted
-
-        # BFS
-        state_queue = [(my_start_pos, 0)]
-        visited = {tuple(my_start_pos)}
-        is_reached = False
-        while state_queue and not is_reached:
-            cur_pos, cur_step = state_queue.pop(0)
-            r, c = cur_pos
-            if cur_step == max_step: 
-                break
-            for dir, move in enumerate(self.moves):
-                if chess_board[r, c, dir]:
-                    continue
-
-                next_pos = (cur_pos[0] + move[0],cur_pos[1]+move[1])
-                if np.array_equal(next_pos, adv_pos) or tuple(next_pos) in visited:
-                    continue
-                if np.array_equal(next_pos, my_end_pos):
-                    is_reached = True
-                    break
-
-                visited.add(tuple(next_pos))
-                state_queue.append((next_pos, cur_step + 1))
-        return is_reached
 
     def check_endgame(self, chess_board, my_pos, adv_pos,board_size):
         """
@@ -182,13 +135,15 @@ class StudentAgent(Agent):
 
         Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
         """
-        depth_limit = 2 # set the depth limit
-        time_limit = 20
-        self.endgame_timer = 0
-        self.check_step_timer = 0
-        start = time.time()
         
         board_size = chess_board.shape[1]
+        depth_limit = 4
+        if board_size > 7:
+            depth_limit = 2
+        self.endgame_timer = 0
+        self.check_step_timer = 0
+        self.timer = time.time()
+        
 
         best_score = -1
         best_depth = depth_limit
@@ -196,17 +151,19 @@ class StudentAgent(Agent):
         valid_steps = self.get_valid_steps(chess_board,my_pos,adv_pos,max_step)
         # filter stupid steps
         stupid_steps_0 = set(filter(lambda step: self.check_stupid_step_0(chess_board,step),valid_steps)) # depth 0 stupid moves
+        candidate_steps = valid_steps - stupid_steps_0
+        board_size <= 7
         stupid_steps_1 = set(filter(lambda step: self.check_stupid_step_1(chess_board,step,adv_pos,max_step),valid_steps)) # depth 1 stupid moves
-        candidate_steps = valid_steps - (stupid_steps_0 | stupid_steps_1)
+        candidate_steps = valid_steps - stupid_steps_1
+
 
         if len(candidate_steps) == 0:
             if(len(stupid_steps_1 > 0)):
                 best_move = stupid_steps_1.pop()
             else:
                 best_move = stupid_steps_0.pop()
-        print("") 
         for step in candidate_steps:
-            if time.time() - start > time_limit:
+            if (time.time() - self.timer) > self.time_limit:
                 print('time limit exceeded')
                 break
             # a new move of step-size steps has been generated here---
@@ -238,9 +195,9 @@ class StudentAgent(Agent):
                 best_weighted_score
         if self.first_turn == True:
             self.first_turn = False
-            time_limit = 1.5
-        print (time.time() - start)
-
+            self.time_limit = 1.8
+        if (time.time() - self.timer) > self.time_limit:
+            print(time.time() - self.timer)
         return best_move
 
     def minimax(self, chess_board, my_pos, adv_pos, max_step, board_size, is_maximizing, depth):
@@ -292,6 +249,8 @@ class StudentAgent(Agent):
             candidate_steps = valid_steps - (stupid_steps_0 | stupid_steps_1)
 
             for step in candidate_steps: # move to each square...
+                if (time.time() - self.timer) > self.time_limit:
+                    break
                 r,c,dir = (step[0],step[1],step[2])
                 self.set_barrier(chess_board, r, c, dir)  # and unset_barrier at the same position later
                 # Add this move to the move history
@@ -428,5 +387,53 @@ class StudentAgent(Agent):
             if self.check_valid_step(chess_board,adv_pos,win_pos,self.opposites[empty_dir],(r,c),max_step):
                 return True
         return False
+
+    def check_valid_step(self, chess_board, my_start_pos, my_end_pos, dir, adv_pos, max_step):
+        """
+        Check if the step the agent takes is valid (reachable and within max steps).
+
+        Parameters
+        ----------
+        start_pos : tuple
+            The start position of the agent.
+        end_pos : np.ndarray
+            The end position of the agent.
+        dir : int
+            The direction of the barrier.
+        """
+
+        # Endpoint already has barrier or is boarder
+        r, c = my_end_pos
+        if chess_board[r, c, dir]:
+            return False
+        if np.array_equal(my_start_pos, my_end_pos):
+            return True
+
+        # Get position of the adversary... deleted
+
+        # BFS
+        state_queue = [(my_start_pos, 0)]
+        visited = {tuple(my_start_pos)}
+        is_reached = False
+        while state_queue and not is_reached:
+            cur_pos, cur_step = state_queue.pop(0)
+            r, c = cur_pos
+            if cur_step == max_step: 
+                break
+            for dir, move in enumerate(self.moves):
+                if chess_board[r, c, dir]:
+                    continue
+
+                next_pos = (cur_pos[0] + move[0],cur_pos[1]+move[1])
+                if np.array_equal(next_pos, adv_pos) or tuple(next_pos) in visited:
+                    continue
+                if np.array_equal(next_pos, my_end_pos):
+                    is_reached = True
+                    break
+
+                visited.add(tuple(next_pos))
+                state_queue.append((next_pos, cur_step + 1))
+        return is_reached
+
     
     
