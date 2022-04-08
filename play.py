@@ -10,8 +10,8 @@ args.autoplay_runs = 100
 args.board_size_min = 4
 args.board_size_max = 6
 s1 = simulator.Simulator(args)
-#result = s1.autoplay()
-result = s1.run()
+result = s1.autoplay()
+#result = s1.run()
 
 
 

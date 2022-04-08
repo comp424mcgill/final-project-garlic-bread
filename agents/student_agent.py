@@ -378,7 +378,7 @@ class StudentAgent(Agent):
         state_queue = [(my_start_pos, 0)]
         visited = {tuple(my_start_pos)}
         cur_step = 0
-        while cur_step < max_step:
+        while state_queue:
             cur_pos, cur_step = state_queue.pop(0)
             r, c = cur_pos
             if cur_step == max_step:
