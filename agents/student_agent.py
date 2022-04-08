@@ -30,10 +30,10 @@ class StudentAgent(Agent):
         self.first_turn = True
         self.timer = 0
         self.time_limit = 28
-        self.search_count = 0 # count number of times search_valid_pos is run per turn
-        self.step_count = 0 # count number of steps considered per turn
-        self.step_get_time = 0 # track total number of time spent getting valid steps
-        self.check_end_time = 0 # track time spent in checking endgames
+        # self.search_count = 0 # count number of times search_valid_pos is run per turn
+        # self.step_count = 0 # count number of steps considered per turn
+        # self.step_get_time = 0 # track total number of time spent getting valid steps
+        # self.check_end_time = 0 # track time spent in checking endgames
 
     # THE ACTAUL IMPLEMENTATION...
     def step(self, chess_board, my_pos, adv_pos, max_step):
@@ -57,13 +57,10 @@ class StudentAgent(Agent):
         self.check_end_time = 0
 
         board_size = chess_board.shape[1]
-        depth_limit = 3
-        if board_size > 8:
-            depth_limit = 2
         self.timer = time.time()    # record the current time at the start of each step
 
         best_score = -1
-        best_depth = depth_limit
+        best_depth = 0
         # Heuristics to choose the move with a higher percentage of winning rate
         weighted_score = 0
 
@@ -80,68 +77,75 @@ class StudentAgent(Agent):
 
         count = 0
         reduce_depth = True
+    
+        for n in range(1,3): # iterative deepening (two times)
+            # depth limit logic
+            if n == 1: 
+                 # check for winning move even though it would be more efficient to store this, it is only ~40-100 checks which is quite small relative the total
+                 # number of checks that we do (~14000 before hitting the time limit)
+                 # would be more efficient to implement a breadth-first search, but I don't have time to do that
+                depth_limit = 0
+            else:
+                depth_limit = 1 # go to depth 1
+                if board_size < 9: # if smaller board, go deeper
+                    depth_limit = depth_limit + 1
+                if self.first_turn: # if first turn, go deeper
+                    depth_limit = depth_limit + 1
+                if len(candidate_steps) < 20: # if few options available, go deeper
+                    depth_limit = depth_limit + 1
+            for step in candidate_steps:
+                count += 1
+                self.step_count += 1
+                # a new move of step-size steps has been generated here---
+                r,c,dir = (step[0],step[1],step[2])
+                self.set_barrier(chess_board,r,c,dir)
+                
+                # Run the minimax algo to check where to place our agent is the best
+                # this is the minimizing node
+                score, ret_depth, results = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False,0, depth_limit)
+                
+                self.unset_barrier(chess_board, r, c, dir)
 
-        if(len(candidate_steps) < 20): # if there are few moves available, increase depth limit
-            depth_limit = depth_limit + 1
+                weighted_score = (results[0]-results[1])/(results[2])
 
-        for step in candidate_steps:
-            count += 1
-            self.step_count += 1
-            if (time.time() - self.timer) > self.time_limit:
-                # print('time limit exceeded')
-                break
-            # a new move of step-size steps has been generated here---
-            r,c,dir = (step[0],step[1],step[2])
-            self.set_barrier(chess_board,r,c,dir)
-            
-            # Run the minimax algo to check where to place our agent is the best
-            # this is the minimizing node
-            score, ret_depth, results = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False,1, depth_limit)
-            
-            self.unset_barrier(chess_board, r, c, dir)
+                # explanation: the series of elif statements are essentiall a decision hierarchy of deciding the best move where score -> depth -> weighted_score is the priority of move decision.
+                # therefore, whenever we are assigning the best move in the hierarchy, we need to also assign the best_depth and the best_weighted_score at that location so that the information
+                # of the current best_move is stored.
+                if score == 1:
+                    best_move = ((r,c),dir)
+                    break
+                elif score > best_score:
+                    best_move = ((r,c),dir)
+                    best_depth = ret_depth
+                    best_weighted_score = weighted_score  # don't need it here # yes we do!
+                # losing or drawing closer to 0 depth (bottom of search tree) is preferred
+                elif score == best_score and ret_depth > best_depth:
+                    best_move = ((r,c),dir)
+                    best_depth = ret_depth
+                    best_weighted_score = weighted_score # the weighted score of the best move, not the best_weighted score of any move
+                # a move which has a higher weighted score is better, all other things equal
+                elif score ==  best_score and ret_depth == best_depth and weighted_score > best_weighted_score:
+                    best_move = ((r,c),dir)
+                    best_depth = ret_depth
+                    best_weighted_score = weighted_score
+                
+                if best_score == 0.75 and reduce_depth: # if depth limit has been reached for an indeterminate step, do shallower search to allow us to check every possibility for a quick win
+                    reduce_depth = False
+                    depth_limit = depth_limit - 1
 
-            weighted_score = (results[0]-results[1])/(results[2])
+                if (time.time() - self.timer) > self.time_limit:
+                    # print('time limit exceeded')
+                    break
 
-            # explanation: the series of elif statements are essentiall a decision hierarchy of deciding the best move where score -> depth -> weighted_score is the priority of move decision.
-            # therefore, whenever we are assigning the best move in the hierarchy, we need to also assign the best_depth and the best_weighted_score at that location so that the information
-            # of the current best_move is stored.
-            if score == 1:
-                best_move = ((r,c),dir)
-                print('found winner')
-                break
-            elif score > best_score:
-                best_move = ((r,c),dir)
-                best_depth = ret_depth
-                best_weighted_score = weighted_score  # don't need it here # yes we do!
-            # losing or drawing closer to 0 depth (bottom of search tree) is preferred
-            elif score == best_score and ret_depth < best_depth:
-                best_move = ((r,c),dir)
-                best_depth = ret_depth
-                best_weighted_score = weighted_score # the weighted score of the best move, not the best_weighted score of any move
-            # a move which has a higher weighted score is better, all other things equal
-            elif score ==  best_score and ret_depth == best_depth and weighted_score > best_weighted_score:
-                best_move = ((r,c),dir)
-                best_depth = ret_depth
-                best_weighted_score = weighted_score
-            
-            if best_score == 0.75 and reduce_depth: # do a deeper search to find a candidate step that doesn't lose or draw, then do shallower search to allow us to check every possibility for a quick win
-                reduce_depth = False
-                depth_limit = depth_limit - 1
+            # if (time.time() - self.timer) > self.time_limit:
+                # print(time.time() - self.timer)
 
         if self.first_turn == True:
             self.first_turn = False
             self.time_limit = 1.9
 
-        if (time.time() - self.timer) > self.time_limit:
-            print(time.time() - self.timer)
-
-        print(count)
-        print(len(candidate_steps))
-        print(self.search_count)
-        print(self.step_count)
-        print(self.step_get_time)
-        print(self.check_end_time)
         return best_move
+        
 
     def minimax(self, chess_board, my_pos, adv_pos, max_step, board_size, is_maximizing, depth,depth_limit):
         """
@@ -158,7 +162,7 @@ class StudentAgent(Agent):
         results: [int,int,int]
             array of results discovered (wins-draws-losses)
         """
-        self.step_count += 1
+        # self.step_count += 1
         # Check base cases:
         is_end, s1, s2 = self.check_endgame(chess_board, my_pos, adv_pos,board_size)
         
@@ -191,12 +195,10 @@ class StudentAgent(Agent):
             candidate_steps = valid_steps - stupid_steps  #(stupid_steps_0 | stupid_steps_1)
 
             for step in candidate_steps: # move to each square...
-                if (time.time() - self.timer) > self.time_limit:
-                    break
                 
                 r,c,dir = (step[0],step[1],step[2])
                 self.set_barrier(chess_board, r, c, dir)  # and unset_barrier at the same position later
-            
+
                 # Run the minimax algo to check where to place our agent is the best
                 score,ret_depth,ret_results = self.minimax(chess_board, (r,c), adv_pos, max_step, board_size, False, depth+1,depth_limit)
                 
@@ -214,6 +216,9 @@ class StudentAgent(Agent):
                     best_depth = ret_depth  #ADDED, Best_depth must be assigned within the elif statements
                 elif score == best_score and ret_depth > best_depth:
                     best_depth = ret_depth
+
+                if (time.time() - self.timer) > self.time_limit:
+                    break
                 
             return best_score,best_depth,results
         
@@ -227,8 +232,6 @@ class StudentAgent(Agent):
             candidate_steps = valid_steps - stupid_steps  # (stupid_steps_0 | stupid_steps_1)
             
             for step in candidate_steps: # move to each square...
-                if (time.time() - self.timer) > self.time_limit:
-                    break
                 
                 r,c,dir = (step[0],step[1],step[2])
                 self.set_barrier(chess_board, r, c, dir)  # and unset_barrier at the same position later
@@ -250,83 +253,14 @@ class StudentAgent(Agent):
                 elif score == best_score and ret_depth > best_depth:
                     best_depth = ret_depth
 
+                if (time.time() - self.timer) > self.time_limit:
+                    break
+
             return best_score,best_depth,results
-
-    def check_endgame(self, chess_board, my_pos, adv_pos,board_size):
-        """
-        Check if the game ends and compute the current score of the agents.
-
-        Returns
-        -------
-        is_endgame : bool
-            Whether the game ends.
-        player_1_score : int
-            The score of player 1.
-        player_2_score : int
-            The score of player 2.
-        """
-        start = time.time()
-        # Union-Find
-        father = dict()
-        for r in range(board_size):
-            for c in range(board_size):
-                father[(r, c)] = (r, c)
-
-        def find(pos):
-            if father[pos] != pos:
-                father[pos] = find(father[pos])
-            return father[pos]
-
-        def union(pos1, pos2):
-            father[pos1] = pos2
-
-        for r in range(board_size):
-            for c in range(board_size):
-                for dir, move in enumerate(
-                    self.moves[1:3]
-                ):  # Only check down and right
-                    if chess_board[r, c, dir + 1]:
-                        continue
-                    pos_a = find((r, c))
-                    pos_b = find((r + move[0], c + move[1]))
-                    if pos_a != pos_b:
-                        union(pos_a, pos_b)
-
-        for r in range(board_size):
-            for c in range(board_size):
-                find((r, c))
-        
-        p0_r = find(tuple(my_pos))
-        p1_r = find(tuple(adv_pos))
-        p0_score = list(father.values()).count(p0_r)
-        p1_score = list(father.values()).count(p1_r)
-        
-        self.check_end_time += (time.time() - start)
-        if p0_r == p1_r:
-            return False, p0_score, p1_score
-        '''
-        player_win = None
-        win_blocks = -1
-        if p0_score > p1_score:
-            player_win = 0
-            win_blocks = p0_score
-        elif p0_score < p1_score:
-            player_win = 1
-            win_blocks = p1_score
-        else:
-            player_win = -1  # Tie
-        if player_win >= 0:
-            logging.info(
-                f"Game ends! Player {self.player_names[player_win]} wins having control over {win_blocks} blocks!"
-            )
-        else:
-            logging.info("Game ends! It is a Tie!")
-        '''
-        return True, p0_score, p1_score
 
 
     def get_valid_steps(self, chess_board, my_pos, adv_pos, max_step): # returns set (can change to list if necessary) of valid steps from current position
-        start = time.time()
+        # start = time.time()
         end_posits = [my_pos]
         valid_steps = set()
         end_posits = self.search_valid_pos(chess_board,my_pos,adv_pos,max_step)
@@ -334,7 +268,7 @@ class StudentAgent(Agent):
             empty_edges = self.get_empty_edges(chess_board,end_pos)
             for dir in empty_edges:
                 valid_steps.add((end_pos[0],end_pos[1],dir))
-        self.step_get_time += (time.time()-start)
+        # self.step_get_time += (time.time()-start)
         return valid_steps        
 
     def search_valid_pos(self, chess_board, my_start_pos, adv_pos, max_step):
@@ -348,7 +282,7 @@ class StudentAgent(Agent):
             The end position of the agent.
         """
         # BFS
-        self.search_count = self.search_count + 1
+        # self.search_count = self.search_count + 1
         state_queue = [(my_start_pos, 0)]
         visited = {tuple(my_start_pos)}
         cur_step = 0
@@ -408,7 +342,6 @@ class StudentAgent(Agent):
             if self.check_valid_step(chess_board,adv_pos,win_pos,self.opposites[empty_dir],(r,c),max_step):
                 return True
         return False
-
 
     def check_valid_step(self, chess_board, my_start_pos, my_end_pos, dir, adv_pos, max_step):
         """
@@ -472,7 +405,77 @@ class StudentAgent(Agent):
         move = self.moves[dir]
         chess_board[r + move[0], c + move[1], self.opposites[dir]] = False
 
-    
+    def check_endgame(self, chess_board, my_pos, adv_pos,board_size):
+        """
+        Check if the game ends and compute the current score of the agents.
+
+        Returns
+        -------
+        is_endgame : bool
+            Whether the game ends.
+        player_1_score : int
+            The score of player 1.
+        player_2_score : int
+            The score of player 2.
+        """
+        # start = time.time()
+        # Union-Find
+        father = dict()
+        for r in range(board_size):
+            for c in range(board_size):
+                father[(r, c)] = (r, c)
+
+        def find(pos):
+            if father[pos] != pos:
+                father[pos] = find(father[pos])
+            return father[pos]
+
+        def union(pos1, pos2):
+            father[pos1] = pos2
+
+        for r in range(board_size):
+            for c in range(board_size):
+                for dir, move in enumerate(
+                    self.moves[1:3]
+                ):  # Only check down and right
+                    if chess_board[r, c, dir + 1]:
+                        continue
+                    pos_a = find((r, c))
+                    pos_b = find((r + move[0], c + move[1]))
+                    if pos_a != pos_b:
+                        union(pos_a, pos_b)
+
+        for r in range(board_size):
+            for c in range(board_size):
+                find((r, c))
+        
+        p0_r = find(tuple(my_pos))
+        p1_r = find(tuple(adv_pos))
+        p0_score = list(father.values()).count(p0_r)
+        p1_score = list(father.values()).count(p1_r)
+        
+        # self.check_end_time += (time.time() - start)
+        if p0_r == p1_r:
+            return False, p0_score, p1_score
+        '''
+        player_win = None
+        win_blocks = -1
+        if p0_score > p1_score:
+            player_win = 0
+            win_blocks = p0_score
+        elif p0_score < p1_score:
+            player_win = 1
+            win_blocks = p1_score
+        else:
+            player_win = -1  # Tie
+        if player_win >= 0:
+            logging.info(
+                f"Game ends! Player {self.player_names[player_win]} wins having control over {win_blocks} blocks!"
+            )
+        else:
+            logging.info("Game ends! It is a Tie!")
+        '''
+        return True, p0_score, p1_score
        
 
     
