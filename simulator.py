@@ -32,7 +32,7 @@ def get_args():
     parser.add_argument("--display_save", action="store_true", default=False)
     parser.add_argument("--display_save_path", type=str, default="plots/")
     parser.add_argument("--autoplay", action="store_true", default=False)
-    parser.add_argument("--autoplay_runs", type=int, default=1000)
+    parser.add_argument("--autoplay_runs", type=int, default=100)
     args = parser.parse_args()
     return args
 
@@ -94,6 +94,7 @@ class Simulator:
         """
         Run multiple simulations of the gameplay and aggregate win %
         """
+        args = self.args
         p1_win_count = 0
         p2_win_count = 0
         p1_times = []
@@ -126,7 +127,7 @@ class Simulator:
                 p2_times.append(p1_time)
 
         logger.info(
-            f"Player {PLAYER_1_NAME} win percentage: {p1_win_count / self.args.autoplay_runs} ({np.round(np.mean(p1_times), 5)} seconds/game)"
+            f"layer {PLAYER_1_NAME} win percentage: {p1_win_count / self.args.autoplay_runs} ({np.round(np.mean(p1_times), 5)} seconds/game)"
         )
         logger.info(
             f"Player {PLAYER_2_NAME} win percentage: {p2_win_count / self.args.autoplay_runs}, ({np.round(np.mean(p2_times), 5)} seconds/game)"

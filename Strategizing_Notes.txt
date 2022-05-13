@@ -1,0 +1,22 @@
+Implementation stuff
+- determine available moves
+- evaluate whether a position/move ends the game and also evaluate which player wins in such a state
+(already provided in check_endgame() in world.py)
+	- game ends when there is no path from player to player
+	- compute how many distinct paths there are from 1 player to another?
+	- how many walls would be required to block the path from A to B
+	- would this move allow the game to be ended and who would win?
+Strategy
+- never end turn with 3 walls around you if opponent is fewer than M steps away
+- randomly move initially (or just use simple heuristic), then search when there are fewer moves available
+- alpha beta pruning -> in a certain state, if a certain player can win with a move, there is no need to consider other moves
+- heursitic: minimum number of walls to enclose the player
+- determine conditions for switching from simple heuristic to alpha-beta search
+
+UPDATE:
+We want to reduce the branching factor of the search tree but still cover each possible distance. 
+eg. for a max_step equal to 5, we search some move of distance 1, some move of distance 2, some of distance 3, 4, and 5.
+
+Implemented the minimax algo.
+
+How to call the functions like check_valid_step() from world.py in student_agent.py file??
